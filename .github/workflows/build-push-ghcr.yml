@@ -14,15 +14,18 @@ permissions:
   packages: write
   contents: read
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/localstack/localstack
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/${OWNER,,}/localstack-dev/localstack" >> "$GITHUB_OUTPUT"
+        env:
+          OWNER: ${{ github.repository_owner }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -52,7 +55,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}
+          tags: ${{ steps.image.outputs.name }}:${{ steps.tag.outputs.tag }}
           build-args: |
             LOCALSTACK_BUILD_VERSION=0.0.1.dev0
             LOCALSTACK_BUILD_DATE=${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
