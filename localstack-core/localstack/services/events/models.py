@@ -247,7 +247,7 @@ class Connection:
     last_modified_time: Timestamp = field(init=False, default_factory=lambda: datetime.now(UTC))
     last_authorized_time: Timestamp = field(init=False, default_factory=lambda: datetime.now(UTC))
     tags: TagList = field(default_factory=list)
-    id: str = str(uuid.uuid4())
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def __post_init__(self):
         if self.tags is None:
@@ -276,7 +276,7 @@ class ApiDestination:
     last_modified_time: Timestamp = field(init=False, default_factory=lambda: datetime.now(UTC))
     last_authorized_time: Timestamp = field(init=False, default_factory=lambda: datetime.now(UTC))
     tags: TagList = field(default_factory=list)
-    id: str = str(short_uid())
+    id: str = field(default_factory=lambda: str(short_uid()))
 
     def __post_init__(self):
         if self.tags is None:
