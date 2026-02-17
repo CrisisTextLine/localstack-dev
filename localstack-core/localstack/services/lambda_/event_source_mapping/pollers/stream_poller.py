@@ -392,6 +392,12 @@ class StreamPoller(Poller):
                         self.source_arn,
                     )
                     self.shards = self.initialize_shards()
+                elif "SequenceNumber" in str(e):
+                    LOG.debug(
+                        "Invalid SequenceNumber for stream %s. Re-initializing shards.",
+                        self.source_arn,
+                    )
+                    self.shards = self.initialize_shards()
                 else:
                     LOG.warning(
                         "Source stream %s does not exist: %s",

@@ -94,6 +94,7 @@ API_DEPENDENCIES_OPTIONAL = {
         "sts",  # Credentials injection
         # Additional dependencies to Pro-only services are defined in ext
     ],
+    "pipes": ["sqs", "kinesis", "dynamodbstreams", "events"],
     "ses": ["sns"],
     "sns": ["sqs", "lambda", "firehose", "ses", "logs"],
     "sqs": ["cloudwatch"],
