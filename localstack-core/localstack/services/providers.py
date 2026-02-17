@@ -239,6 +239,14 @@ def opensearch():
 
 
 @aws_provider()
+def pipes():
+    from localstack.services.pipes.provider import PipesProvider
+
+    provider = PipesProvider()
+    return Service.for_provider(provider)
+
+
+@aws_provider()
 def redshift():
     from localstack.services.moto import MotoFallbackDispatcher
     from localstack.services.redshift.provider import RedshiftProvider
