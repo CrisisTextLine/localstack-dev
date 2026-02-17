@@ -5,8 +5,7 @@ FROM python:3.13.12-slim-trixie@sha256:3de9a8d7aedbb7984dc18f2dff178a7850f16c1ae
 ARG TARGETARCH
 
 # Install runtime OS package dependencies
-RUN --mount=type=cache,target=/var/cache/apt \
-    apt-get update && \
+RUN apt-get update && \
         # Install dependencies to add additional repos
         apt-get install -y --no-install-recommends \
             # Runtime packages (groff-base is necessary for AWS CLI help)
@@ -100,8 +99,7 @@ FROM base AS builder
 ARG TARGETARCH
 
 # Install build dependencies to base
-RUN --mount=type=cache,target=/var/cache/apt \
-    apt-get update && \
+RUN apt-get update && \
         # Install dependencies to add additional repos
         # g++ is a workaround to fix the JPype1 compile error on ARM Linux "gcc: fatal error: cannot execute ‘cc1plus’"
         apt-get install -y gcc g++
