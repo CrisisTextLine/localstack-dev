@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import re
@@ -33,6 +34,7 @@ class ConnectionService:
         description: ConnectionDescription | None = None,
         invocation_connectivity_parameters: ConnectivityResourceParameters | None = None,
         create_secret: bool = True,
+        connection_id: str | None = None,
     ):
         self._validate_input(name, authorization_type)
         state = self._get_initial_state(authorization_type)
@@ -55,6 +57,17 @@ class ConnectionService:
             description,
             invocation_connectivity_parameters,
         )
+        if connection_id:
+            self.connection.id = connection_id
+        else:
+            # Deterministic ID based on name for reproducible ARNs in local development
+            self.connection.id = self._deterministic_id(name)
+
+    @staticmethod
+    def _deterministic_id(name: str) -> str:
+        """Generate a deterministic UUID-formatted ID from the connection name."""
+        h = hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()
+        return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
 
     @classmethod
     def restore_from_connection(cls, connection: Connection):

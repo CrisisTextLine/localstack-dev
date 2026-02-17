@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import logging
 import re
@@ -63,6 +64,9 @@ class APIDestinationService:
             invocation_rate_limit_per_second,
             description,
         )
+        # Deterministic ID based on name for reproducible ARNs in local development
+        h = hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()
+        self.api_destination.id = h[:8]
 
     @classmethod
     def restore_from_api_destination_and_connection(
