@@ -74,8 +74,8 @@ class ApiDestinationPipeTarget(PipeTarget):
         """Fetch connection auth from the events store and SecretsManager, then apply headers.
 
         The Connection model stores public parameters only (secrets are stripped).
-        The actual secret values (ApiKeyValue, Password) are stored in SecretsManager
-        under the connection's secret_arn.
+        The actual secret values are stored in SecretsManager under the connection's
+        secret_arn using lowercase keys (e.g. {"username": ..., "password": ...}).
         """
         try:
             from localstack.services.events.models import events_stores
@@ -105,16 +105,16 @@ class ApiDestinationPipeTarget(PipeTarget):
             auth_type = (connection.authorization_type or "").upper()
 
             if auth_type == "API_KEY":
-                api_key_params = auth_params.get("ApiKeyAuthParameters", {})
-                key_name = api_key_params.get("ApiKeyName", "")
-                key_value = api_key_params.get("ApiKeyValue", "")
+                # Secret format: {"api_key_name": "...", "api_key_value": "..."}
+                key_name = auth_params.get("api_key_name", "")
+                key_value = auth_params.get("api_key_value", "")
                 if key_name and key_value:
                     headers[key_name] = key_value
 
             elif auth_type == "BASIC":
-                basic_params = auth_params.get("BasicAuthParameters", {})
-                username = basic_params.get("Username", "")
-                password = basic_params.get("Password", "")
+                # Secret format: {"username": "...", "password": "..."}
+                username = auth_params.get("username", "")
+                password = auth_params.get("password", "")
                 auth = "Basic " + to_str(
                     base64.b64encode(f"{username}:{password}".encode("ascii"))
                 )
