@@ -1,0 +1,99 @@
+name: Release Notice
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  release-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for semver labels
+        id: labels
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+          HAS_SEMVER=false
+          BUMP_TYPE=""
+
+          if echo "$LABELS" | grep -q '"semver: major"'; then
+            HAS_SEMVER=true
+            BUMP_TYPE="major"
+          elif echo "$LABELS" | grep -q '"semver: minor"'; then
+            HAS_SEMVER=true
+            BUMP_TYPE="minor"
+          elif echo "$LABELS" | grep -q '"semver: patch"'; then
+            HAS_SEMVER=true
+            BUMP_TYPE="patch"
+          fi
+
+          echo "has_semver=$HAS_SEMVER" >> "$GITHUB_OUTPUT"
+          echo "bump_type=$BUMP_TYPE" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate predicted version
+        if: steps.labels.outputs.has_semver == 'true'
+        id: version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          VERSION="${LATEST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          case "${{ steps.labels.outputs.bump_type }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          echo "tag=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Add or update release notice
+        if: steps.labels.outputs.has_semver == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          MARKER="<!-- release-notice -->"
+          BODY="${MARKER}
+          > **Release Notice:** Merging this PR will create a **${{ steps.version.outputs.tag }}** release (\`${{ steps.labels.outputs.bump_type }}\` bump)."
+
+          # Find existing comment
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | startswith("<!-- release-notice -->")) | .id' | head -1)
+
+          if [[ -n "$COMMENT_ID" ]]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -X PATCH -f body="$BODY"
+          else
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
+
+      - name: Remove release notice
+        if: steps.labels.outputs.has_semver == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | startswith("<!-- release-notice -->")) | .id' | head -1)
+
+          if [[ -n "$COMMENT_ID" ]]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" -X DELETE
+          fi
