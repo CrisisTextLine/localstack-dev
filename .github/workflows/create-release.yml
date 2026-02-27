@@ -15,12 +15,20 @@ on:
           - minor
           - major
 
+concurrency:
+  group: create-release
+  cancel-in-progress: true
+
 permissions:
   contents: write
+  packages: write
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      has_changes: ${{ steps.changes.outputs.has_changes }}
     # Run if: manual dispatch OR (PR was merged AND has a semver label)
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -34,7 +42,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for changes since last tag
+        id: changes
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [[ -n "$LATEST_TAG" ]]; then
+            COMMIT_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+            if [[ "$COMMIT_COUNT" -eq 0 ]]; then
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+              echo "### Skipped — no changes since $LATEST_TAG" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Determine bump type
+        if: steps.changes.outputs.has_changes == 'true'
         id: bump
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -51,6 +76,7 @@ jobs:
           fi
 
       - name: Calculate next version
+        if: steps.changes.outputs.has_changes == 'true'
         id: version
         run: |
           if LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
@@ -80,9 +106,11 @@ jobs:
 
           NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
           echo "### Version bump: $LATEST_TAG → $NEW_TAG (${{ steps.bump.outputs.type }})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create release
+        if: steps.changes.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -95,3 +123,13 @@ jobs:
             ARGS+=(--notes-start-tag "${{ steps.version.outputs.previous }}")
           fi
           gh release create "${ARGS[@]}"
+
+  build-and-push:
+    needs: create-release
+    if: needs.create-release.outputs.has_changes == 'true'
+    uses: ./.github/workflows/build-push-ghcr.yml
+    with:
+      version: ${{ needs.create-release.outputs.version }}
+    permissions:
+      packages: write
+      contents: read

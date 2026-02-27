@@ -3,12 +3,22 @@ name: Build and Push to GHCR
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      version:
+        description: "Semver version (e.g., 0.1.0)"
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
         description: "Image tag"
         required: false
         default: "latest"
+
+concurrency:
+  group: build-push-${{ github.event.release.tag_name || inputs.version || inputs.tag || 'manual' }}
+  cancel-in-progress: true
 
 permissions:
   packages: write
@@ -46,6 +56,9 @@ jobs:
             VERSION_NUMBER="${VERSION#v}"
             echo "version=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
             echo "tags=${IMAGE}:${VERSION_NUMBER},${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.version }}" ]]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "tags=${IMAGE}:${{ inputs.version }},${IMAGE}:latest" >> "$GITHUB_OUTPUT"
           else
             TAG="${{ inputs.tag }}"
             echo "version=0.0.0.dev0" >> "$GITHUB_OUTPUT"
