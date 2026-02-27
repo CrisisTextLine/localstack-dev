@@ -53,8 +53,12 @@ jobs:
       - name: Calculate next version
         id: version
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "previous=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          if LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+            echo "previous=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          else
+            LATEST_TAG="v0.0.0"
+            echo "previous=" >> "$GITHUB_OUTPUT"
+          fi
 
           VERSION="${LATEST_TAG#v}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
@@ -82,7 +86,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
-            --generate-notes \
-            --notes-start-tag "${{ steps.version.outputs.previous }}"
+          ARGS=(
+            "${{ steps.version.outputs.tag }}"
+            --title "${{ steps.version.outputs.tag }}"
+            --generate-notes
+          )
+          if [[ -n "${{ steps.version.outputs.previous }}" ]]; then
+            ARGS+=(--notes-start-tag "${{ steps.version.outputs.previous }}")
+          fi
+          gh release create "${ARGS[@]}"
